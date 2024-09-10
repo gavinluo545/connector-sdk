@@ -1,0 +1,37 @@
+{
+  "connection": {
+    "connectionId": "1",
+    "connectionName": "1",
+    "connectionParams": "{\"ip\":\"127.0.0.1\",\"port\":9000}",
+    "autoRecovery": false
+  },
+  "tags": [
+    {
+      "connectionId": "1",
+      "tagId": "1",
+      "tagName": "1",
+      "attributes": {
+        "deviceKey": "1125746",
+        "ioa": "2897"
+      }
+    },
+    {
+      "connectionId": "1",
+      "tagId": "2",
+      "tagName": "2",
+      "attributes": {
+        "deviceKey": "1125746",
+        "ioa": "2564"
+      }
+    },
+    {
+      "connectionId": "1",
+      "tagId": "3",
+      "tagName": "4",
+      "attributes": {
+        "deviceKey": "1125746",
+        "ioa": "2899"
+      }
+    }
+  ]
+}
