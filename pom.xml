@@ -10,7 +10,7 @@
     <packaging>jar</packaging>
     <name>${project.artifactId}-${project.version}</name>
     <url>https://github.com/gavinluo545/connector-sdk</url>
-
+    <description>通用边缘端采集器框架</description>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
