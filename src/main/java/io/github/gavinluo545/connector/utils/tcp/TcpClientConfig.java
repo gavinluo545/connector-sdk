@@ -6,9 +6,6 @@ import lombok.Setter;
 
 import java.util.function.BiFunction;
 
-/**
- * @author gavinluo545@gmail.com
- */
 @Setter
 @Getter
 public class TcpClientConfig<I extends FrameMessage, O extends FrameMessage> extends AbstractTcpConfig<I,O> {

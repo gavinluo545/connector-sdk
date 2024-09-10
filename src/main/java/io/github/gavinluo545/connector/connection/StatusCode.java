@@ -9,19 +9,10 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/**
- * StatusCode 是枚举类型，表示连接器中的状态码。
- * 每个枚举值包含一个短整型的状态码和对应的描述信息。
- *
- * @author gavinluo545@gmail.com
- */
 @Getter
 @AllArgsConstructor
 public enum StatusCode {
 
-    /**
-     * 表示状态码的枚举值
-     */
     OK((short) 1, "好"),
     ERR((short) -1, "坏"),
 
@@ -34,15 +25,9 @@ public enum StatusCode {
     TAG_READ_NOT_SUPPORT((short) 23, "点位不支持读"),
     ;
 
-    /**
-     * 状态码
-     */
     @JsonValue
     private final Short code;
 
-    /**
-     * 状态码对应的描述信息
-     */
     private final String message;
 
     public static final Map<Short, StatusCode> CODE_MAP = Arrays.stream(StatusCode.values()).collect(Collectors.toMap(StatusCode::getCode, Function.identity()));

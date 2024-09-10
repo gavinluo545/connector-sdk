@@ -21,9 +21,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * @author gavinluo545@gmail.com
- */
 @Slf4j
 public abstract class AbstractTcpClient<I extends AbstractFrameMessage, O extends AbstractFrameMessage> extends AbstractTcp<I, O, TcpClientConfig<I, O>> implements TcpClient<I, O> {
     protected ScheduledExecutorService autoRecoveryExecutor;

@@ -5,11 +5,6 @@ import io.netty.channel.Channel;
 
 import java.util.List;
 
-/**
- * TcpServer.java
- *
- * @author gavinluo545@gmail.com
- */
 public interface TcpServer<I extends FrameMessage, O extends FrameMessage> extends Tcp<I, O, TcpServerConfig<I, O>> {
     /**
      * 获取服务端配置

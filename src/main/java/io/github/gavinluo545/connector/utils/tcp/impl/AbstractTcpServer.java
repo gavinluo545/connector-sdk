@@ -17,11 +17,6 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/**
- * AbstractTcpServer.java
- *
- * @author gavinluo545@gmail.com
- */
 @Slf4j
 public abstract class AbstractTcpServer<I extends AbstractFrameMessage, O extends AbstractFrameMessage> extends AbstractTcp<I, O, TcpServerConfig<I, O>> implements TcpServer<I, O> {
 

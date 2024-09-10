@@ -4,11 +4,6 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
-/**
- * NameThreadFactory
- *
- * @author gavinluo545@gmail.com
- */
 public class NameThreadFactory implements ThreadFactory {
 
     private final AtomicInteger id = new AtomicInteger(0);

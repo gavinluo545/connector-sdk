@@ -11,13 +11,6 @@ import lombok.experimental.UtilityClass;
 import java.io.IOException;
 import java.util.List;
 
-/**
- * JSON 工具类，使用 Jackson 处理 JSON 数据。
- * <p>
- * 该类提供了解析 JSON、将对象转为 JSON 字符串等功能，使用了 Jackson 的 ObjectMapper。
- *
- * @author gavinluo545@gmail.com
- */
 @UtilityClass
 public class JsonUtil {
 
@@ -32,14 +25,6 @@ public class JsonUtil {
         return mapper;
     }
 
-    /**
-     * 将 JSON 数组字符串解析为 List 对象。
-     *
-     * @param text JSON 数组字符串
-     * @param type List 中元素的类型
-     * @param <T>  泛型类型
-     * @return 解析得到的 List 对象
-     */
     public static <T> List<T> parseArray(String text, Class<T> type) {
         try {
             return MAPPER.readValue(text, MAPPER.getTypeFactory().constructCollectionType(List.class, type));
@@ -48,12 +33,6 @@ public class JsonUtil {
         }
     }
 
-    /**
-     * 将对象转为 JSON 字符串。
-     *
-     * @param object 要转换的对象
-     * @return 对象的 JSON 字符串表示
-     */
     public static String toJSONString(Object object) {
         try {
             return MAPPER.writeValueAsString(object);
@@ -62,12 +41,6 @@ public class JsonUtil {
         }
     }
 
-    /**
-     * 将 JSON 字节数组解析为 Jackson 的 ArrayNode。
-     *
-     * @param bytes JSON 字节数组
-     * @return 解析得到的 ArrayNode
-     */
     public static ArrayNode parseArray(byte[] bytes) {
         try {
             return (ArrayNode) MAPPER.readTree(bytes);
@@ -76,12 +49,6 @@ public class JsonUtil {
         }
     }
 
-    /**
-     * 将 JSON 字符串解析为 Jackson 的 ArrayNode。
-     *
-     * @param json JSON 字符串
-     * @return 解析得到的 ArrayNode
-     */
     public static ArrayNode parseArray(String json) {
         try {
             return (ArrayNode) MAPPER.readTree(json);
@@ -90,12 +57,6 @@ public class JsonUtil {
         }
     }
 
-    /**
-     * 将 JSON 字符串解析为 Jackson 的 ObjectNode。
-     *
-     * @param json JSON 字符串
-     * @return 解析得到的 ObjectNode
-     */
     public static ObjectNode parseObject(String json) {
         try {
             return (ObjectNode) MAPPER.readTree(json);
@@ -104,12 +65,6 @@ public class JsonUtil {
         }
     }
 
-    /**
-     * 将 JSON 字节数组解析为 Jackson 的 ObjectNode。
-     *
-     * @param bytes JSON 字节数组
-     * @return 解析得到的 ObjectNode
-     */
     public static ObjectNode parseObject(byte[] bytes) {
         try {
             return (ObjectNode) MAPPER.readTree(bytes);
@@ -118,14 +73,6 @@ public class JsonUtil {
         }
     }
 
-    /**
-     * 将 JSON 字节数组解析为指定类型的对象。
-     *
-     * @param str         JSON 字节数组
-     * @param objectClass 目标对象的类型
-     * @param <T>         泛型类型
-     * @return 解析得到的对象
-     */
     public static <T> T parseObject(byte[] str, Class<T> objectClass) {
         try {
             return MAPPER.readValue(str, objectClass);
@@ -134,14 +81,6 @@ public class JsonUtil {
         }
     }
 
-    /**
-     * 将 JSON 字符串解析为指定类型的对象。
-     *
-     * @param str         JSON 字符串
-     * @param objectClass 目标对象的类型
-     * @param <T>         泛型类型
-     * @return 解析得到的对象
-     */
     public static <T> T parseObject(String str, Class<T> objectClass) {
         try {
             return MAPPER.readValue(str, objectClass);
@@ -150,12 +89,6 @@ public class JsonUtil {
         }
     }
 
-    /**
-     * 将对象转为 JSON 字节数组。
-     *
-     * @param object 要转换的对象
-     * @return 对象的 JSON 字节数组表示
-     */
     public static byte[] toJSONBytes(Object object) {
         try {
             return MAPPER.writeValueAsBytes(object);

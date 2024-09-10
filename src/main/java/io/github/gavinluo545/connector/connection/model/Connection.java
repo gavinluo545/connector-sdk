@@ -11,12 +11,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * 表示设备的连接配置。
- * 该类设计用于保存诸如连接ID、连接名称、超时设置、恢复选项等信息。
- *
- * @author gavinluo545@gmail.com
- */
 @Data
 public class Connection implements Serializable {
     private static final long serialVersionUID = 2002221383969848897L;
@@ -56,7 +50,7 @@ public class Connection implements Serializable {
 
     /**
      * 最长恢复时间(单位，分钟)
-     * 如果<=0 则认为一直尝试异常恢复
+     * 如果小于等于0 则认为一直尝试异常恢复
      **/
     @JsonProperty("maximumRecoveryTime")
     private Integer maximumRecoveryTime = 1440;

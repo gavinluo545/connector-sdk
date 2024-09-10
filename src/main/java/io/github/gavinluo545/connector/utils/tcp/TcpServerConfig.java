@@ -8,11 +8,6 @@ import lombok.Setter;
 
 import java.util.function.BiFunction;
 
-/**
- * TcpServerConfig
- *
- * @author GavinLuo
- */
 @Getter
 @Setter
 public class TcpServerConfig<I extends FrameMessage, O extends FrameMessage> extends AbstractTcpConfig<I, O> {

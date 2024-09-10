@@ -10,11 +10,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * ThreadPoolManager
- *
- * @author gavinluo545@gmail.com
- */
 @Slf4j
 public final class ThreadPoolManager {
 
@@ -43,13 +38,6 @@ public final class ThreadPoolManager {
         Thread.setDefaultUncaughtExceptionHandler((t, e) -> log.error("线程 {} 未捕获未知异常", t.getName(), e));
     }
 
-    /**
-     * Register the thread pool resources with the resource manager.
-     *
-     * @param namespace namespace name
-     * @param group     group name
-     * @param executor  {@link ExecutorService}
-     */
     public void register(String namespace, String group, ExecutorService executor) {
         if (!resourcesManager.containsKey(namespace)) {
             synchronized (this) {
@@ -73,12 +61,6 @@ public final class ThreadPoolManager {
         }
     }
 
-    /**
-     * Cancel the uniform lifecycle management for all threads under this resource.
-     *
-     * @param namespace namespace name
-     * @param group     group name
-     */
     public void deregister(String namespace, String group) {
         if (resourcesManager.containsKey(namespace)) {
             final Object monitor = lockers.get(namespace);
@@ -88,13 +70,6 @@ public final class ThreadPoolManager {
         }
     }
 
-    /**
-     * Undoing the uniform lifecycle management of {@link ExecutorService} under this resource.
-     *
-     * @param namespace namespace name
-     * @param group     group name
-     * @param executor  {@link ExecutorService}
-     */
     public void deregister(String namespace, String group, ExecutorService executor) {
         if (resourcesManager.containsKey(namespace)) {
             final Object monitor = lockers.get(namespace);
@@ -107,11 +82,6 @@ public final class ThreadPoolManager {
         }
     }
 
-    /**
-     * Destroys all thread pool resources under this namespace.
-     *
-     * @param namespace namespace
-     */
     public void destroy(final String namespace) {
         final Object monitor = lockers.get(namespace);
         if (monitor == null) {
@@ -132,12 +102,6 @@ public final class ThreadPoolManager {
         }
     }
 
-    /**
-     * This namespace destroys all thread pool resources under the grouping.
-     *
-     * @param namespace namespace
-     * @param group     group
-     */
     public void destroy(final String namespace, final String group) {
         final Object monitor = lockers.get(namespace);
         if (monitor == null) {
@@ -156,9 +120,6 @@ public final class ThreadPoolManager {
         }
     }
 
-    /**
-     * Shutdown thread pool manager.
-     */
     public static void shutdown() {
         if (!CLOSED.compareAndSet(false, true)) {
             return;

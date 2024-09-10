@@ -4,12 +4,6 @@ import lombok.Data;
 
 import java.io.Serializable;
 
-/**
- * 表示写操作的请求数据对象。
- * 用于在写操作中携带点位信息及待写入的值。
- *
- * @author gavinluo545@gmail.com
- */
 @Data
 public class TagWrite implements Serializable {
     private static final long serialVersionUID = 879759007809448630L;

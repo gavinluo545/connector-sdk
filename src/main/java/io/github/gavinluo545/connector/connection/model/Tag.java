@@ -8,14 +8,6 @@ import java.io.Serializable;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * 表示一个设备点位。
- * 该类包含了点位的基本信息，如ID、名称、数据类型、读写类型、数据区类型等，以及一些拓展字段用于提供更丰富的信息。
- * <p>
- * Tag
- *
- * @author gavinluo545@gmail.com
- */
 @Data
 public class Tag implements Serializable {
     private static final long serialVersionUID = -3392606545106060643L;

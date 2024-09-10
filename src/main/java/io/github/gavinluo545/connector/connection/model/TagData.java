@@ -6,12 +6,6 @@ import lombok.Data;
 
 import java.io.Serializable;
 
-/**
- * 表示点位的数据对象。
- * 用于在读、写、采集等操作中携带点位的相关信息。
- *
- * @author gavinluo545@gmail.com
- */
 @Data
 public class TagData implements Serializable {
     private static final long serialVersionUID = -7767829466383217523L;

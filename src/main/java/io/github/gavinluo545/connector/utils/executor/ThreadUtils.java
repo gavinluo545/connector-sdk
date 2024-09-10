@@ -8,21 +8,11 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
-/**
- * ThreadUtils
- *
- * @author gavinluo545@gmail.com
- */
 @Slf4j
 public final class ThreadUtils {
 
     private static final int THREAD_MULTIPLER = 2;
 
-    /**
-     * Wait.
-     *
-     * @param object load object
-     */
     public static void objectWait(Object object) {
         try {
             object.wait();
@@ -31,11 +21,6 @@ public final class ThreadUtils {
         }
     }
 
-    /**
-     * Sleep.
-     *
-     * @param millis sleep millisecond
-     */
     public static void sleep(long millis) {
         try {
             Thread.sleep(millis);
@@ -49,11 +34,6 @@ public final class ThreadUtils {
         latch.countDown();
     }
 
-    /**
-     * Await count down latch.
-     *
-     * @param latch count down latch
-     */
     public static void latchAwait(CountDownLatch latch) {
         try {
             latch.await();
@@ -62,13 +42,6 @@ public final class ThreadUtils {
         }
     }
 
-    /**
-     * Await count down latch with timeout.
-     *
-     * @param latch count down latch
-     * @param time  timeout time
-     * @param unit  time unit
-     */
     public static void latchAwait(CountDownLatch latch, long time, TimeUnit unit) {
         try {
             latch.await(time, unit);
@@ -77,21 +50,10 @@ public final class ThreadUtils {
         }
     }
 
-    /**
-     * Through the number of cores, calculate the appropriate number of threads; 1.5-2 times the number of CPU cores.
-     *
-     * @return thread count
-     */
     public static int getSuitableThreadCount() {
         return getSuitableThreadCount(THREAD_MULTIPLER);
     }
 
-    /**
-     * Through the number of cores, calculate the appropriate number of threads.
-     *
-     * @param threadMultiple multiple time of cores
-     * @return thread count
-     */
     public static int getSuitableThreadCount(int threadMultiple) {
         final int coreCount = Runtime.getRuntime().availableProcessors();
         int workerCount = 1;
@@ -123,11 +85,6 @@ public final class ThreadUtils {
         executor.shutdownNow();
     }
 
-    /**
-     * Add Shutdown Hook
-     *
-     * @param runnable runnable
-     */
     public static void addShutdownHook(Runnable runnable) {
         Runtime.getRuntime().addShutdownHook(new Thread(runnable));
     }
