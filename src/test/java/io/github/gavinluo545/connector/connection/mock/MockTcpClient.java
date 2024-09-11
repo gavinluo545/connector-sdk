@@ -1,12 +1,9 @@
 package io.github.gavinluo545.connector.connection.mock;
 
+import io.github.gavinluo545.connector.connection.message.*;
 import io.github.gavinluo545.connector.utils.tcp.TcpClientConfig;
 import io.github.gavinluo545.connector.utils.tcp.impl.AbstractTcpClient;
 import cn.hutool.core.util.RandomUtil;
-import io.github.gavinluo545.connector.connection.message.ExampleHeader;
-import io.github.gavinluo545.connector.connection.message.ExampleRequestMessage;
-import io.github.gavinluo545.connector.connection.message.ExampleRequestPrincipal;
-import io.github.gavinluo545.connector.connection.message.ExampleResponseMessage;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
@@ -39,7 +36,7 @@ public class MockTcpClient extends AbstractTcpClient<ExampleResponseMessage, Exa
     }
 
     public void handleMessage(Channel channel, ExampleRequestMessage msg) {
-//        int randomed = RandomUtil.randomInt(0, 10);
+//        int randomed = RandomUtil.randomInt(0, 29);
 //        if (randomed <= 3) {
 //            //不响应 让服务端等待响应超时
 //            log.info("不响应 让服务端等待响应超时");

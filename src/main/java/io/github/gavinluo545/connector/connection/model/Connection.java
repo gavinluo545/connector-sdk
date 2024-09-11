@@ -1,9 +1,9 @@
 package io.github.gavinluo545.connector.connection.model;
 
-import io.github.gavinluo545.connector.utils.JsonUtil;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.github.gavinluo545.connector.utils.JsonUtil;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -33,13 +33,6 @@ public class Connection implements Serializable {
      **/
     @JsonProperty("collectionTimeout")
     private Integer collectionTimeout = 3000;
-
-    /**
-     * 帧间隔，毫秒
-     * 最小100
-     **/
-    @JsonProperty("timeWait")
-    private Integer timeWait = 500;
 
     /**
      * 异常恢复间隔(单位，秒) 默认是30秒
@@ -102,11 +95,6 @@ public class Connection implements Serializable {
     public void setCollectionTimeout(Integer collectionTimeout) {
         Assert.isTrue(collectionTimeout != null && collectionTimeout >= 100);
         this.collectionTimeout = collectionTimeout;
-    }
-
-    public void setTimeWait(Integer timeWait) {
-        Assert.isTrue(timeWait != null && timeWait >= 100);
-        this.timeWait = Assert.notNull(timeWait);
     }
 
     public void setRecoveryInterval(Integer recoveryInterval) {

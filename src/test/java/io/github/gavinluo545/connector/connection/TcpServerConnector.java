@@ -52,11 +52,6 @@ public class TcpServerConnector extends AbstractTcpServerConnector<ExampleReques
     }
 
     @Override
-    public boolean hasMessageId() {
-        return true;
-    }
-
-    @Override
     public TcpServer newTcp(TcpServerConfig<ExampleRequestMessage, ExampleResponseMessage> config) {
         return new TcpServer(config);
     }

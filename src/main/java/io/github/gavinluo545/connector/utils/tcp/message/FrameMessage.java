@@ -7,6 +7,4 @@ public interface FrameMessage extends BinaryCodec, MessageId {
 
     Footer getFooter();
 
-    boolean hasMessageId();
-
 }

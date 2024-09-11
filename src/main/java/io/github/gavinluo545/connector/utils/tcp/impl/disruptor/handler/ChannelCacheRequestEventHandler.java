@@ -1,12 +1,12 @@
 package io.github.gavinluo545.connector.utils.tcp.impl.disruptor.handler;
 
+import com.lmax.disruptor.EventHandler;
+import com.lmax.disruptor.WorkHandler;
 import io.github.gavinluo545.connector.utils.tcp.impl.RequestTimeoutTimer;
 import io.github.gavinluo545.connector.utils.tcp.impl.TcpQPS;
 import io.github.gavinluo545.connector.utils.tcp.impl.disruptor.SequenceId;
 import io.github.gavinluo545.connector.utils.tcp.impl.message.FutureRequest;
 import io.github.gavinluo545.connector.utils.tcp.message.FrameMessage;
-import com.lmax.disruptor.EventHandler;
-import com.lmax.disruptor.WorkHandler;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelPromise;
@@ -15,6 +15,7 @@ import io.netty.util.Timeout;
 import io.netty.util.Timer;
 
 import java.nio.channels.ClosedChannelException;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
@@ -25,13 +26,16 @@ public class ChannelCacheRequestEventHandler implements EventHandler<SequenceId>
     private final Function<String, Channel> getChannelFunc;
     private final Function<Integer, FutureRequest> getFutureRequest;
     private final Consumer<Integer> finalizeFutureRequest;
+    private final Function<String/*serverId-clientId clientId-clientId*/, Byte/*timeoutSenconds*/> sendRequestTimeoutSencondsGet;
     private static final ClosedChannelException closedChannelException = new ClosedChannelException();
     private final EventLoopGroup blockingServiceExecutor;
 
     public ChannelCacheRequestEventHandler(EventLoopGroup blockingServiceExecutor,
+                                           Function<String/*serverId-clientId clientId-clientId*/, Byte/*timeoutSenconds*/> sendRequestTimeoutSencondsGet,
                                            Function<String, Channel> getChannelFunc,
                                            Function<Integer, FutureRequest> getFutureRequest, Consumer<Integer> finalizeFutureRequest) {
         this.blockingServiceExecutor = blockingServiceExecutor;
+        this.sendRequestTimeoutSencondsGet = sendRequestTimeoutSencondsGet;
         this.getChannelFunc = getChannelFunc;
         this.getFutureRequest = getFutureRequest;
         this.finalizeFutureRequest = finalizeFutureRequest;
@@ -63,82 +67,29 @@ public class ChannelCacheRequestEventHandler implements EventHandler<SequenceId>
         }
         String channelId = futureRequest.getChannelId();
         FrameMessage message = futureRequest.getMessage();
-        CompletableFuture<FrameMessage> returnFuture = futureRequest.getFuture();
-        BiConsumer<FrameMessage, Throwable> callback = futureRequest.getCallback();
-        Byte sendRequestTimeoutSenconds = futureRequest.getSendRequestTimeoutSenconds();
-        Byte waitResponseTimeoutSenconds = futureRequest.getWaitResponseTimeoutSenconds();
 
         Channel channel = getChannelFunc.apply(channelId);
         if (channel == null || !channel.isActive()) {
-            try {
-                if (returnFuture != null && unFinished(returnFuture)) {
-                    returnFuture.completeExceptionally(closedChannelException);
-                }
-                if (callback != null) {
-                    blockingServiceExecutor.execute(() -> {
-                        try {
-                            callback.accept(null, closedChannelException);
-                        } catch (Exception ignored) {
-                        }
-                    });
-                }
-                return;
-            } finally {
-                finalizeFutureRequest.accept(id);
-            }
+            failed(futureRequest, id, closedChannelException);
+            return;
         }
 
         ChannelPromise promise = channel.newPromise();
-        Timeout waitTimeout;
         Timer requestTimeoutTimer = RequestTimeoutTimer.InstanceHolder.DEFAULT.requestTimeoutTimer;
-        if (returnFuture != null) {
-            waitTimeout = requestTimeoutTimer.newTimeout(timeout -> {
-                if (timeout.isCancelled()) {
-                    return;
-                }
-                if (!promise.isSuccess()) {
-                    promise.cancel(true);
-                } else {
-                    //等待超时
-                    finalizeFutureRequest.accept(id);
-                }
-            }, waitResponseTimeoutSenconds, TimeUnit.SECONDS);
-        } else {
-            waitTimeout = null;
-        }
+
         Timeout sendTimeout = requestTimeoutTimer.newTimeout(timeout -> {
             if (timeout.isCancelled()) {
                 return;
             }
-            if (waitTimeout != null) {
-                waitTimeout.cancel();
-            }
             promise.cancel(true);
-        }, sendRequestTimeoutSenconds, TimeUnit.SECONDS);
+        }, Optional.ofNullable(sendRequestTimeoutSencondsGet.apply(channelId)).orElse((byte) 1), TimeUnit.SECONDS);
 
         promise.addListener((ChannelFutureListener) channelFuture -> {
             if (!channelFuture.isSuccess()) {
-                try {
-                    if (returnFuture != null && unFinished(returnFuture)) {
-                        returnFuture.completeExceptionally(channelFuture.cause());
-                    }
-                    if (callback != null) {
-                        blockingServiceExecutor.execute(() -> {
-                            try {
-                                callback.accept(null, channelFuture.cause());
-                            } catch (Exception ignored) {
-                            }
-                        });
-                    }
-                } finally {
-                    finalizeFutureRequest.accept(id);
-                }
+                failed(futureRequest, id, channelFuture.cause());
             } else {
                 TcpQPS.requestQpsIncr();
                 sendTimeout.cancel();
-                if (waitTimeout != null) {
-                    waitTimeout.cancel();
-                }
             }
         });
 
@@ -147,6 +98,28 @@ public class ChannelCacheRequestEventHandler implements EventHandler<SequenceId>
 
     public boolean unFinished(CompletableFuture<?> completableFuture) {
         return !completableFuture.isCancelled() && !completableFuture.isDone() && !completableFuture.isCompletedExceptionally();
+    }
+
+    public void failed(FutureRequest futureRequest, int id, Throwable throwable) {
+        CompletableFuture<FrameMessage> returnFuture = futureRequest.getFuture();
+        BiConsumer<FrameMessage, Throwable> callback = futureRequest.getCallback();
+        if (returnFuture != null && unFinished(returnFuture)) {
+            try {
+                returnFuture.completeExceptionally(throwable);
+            } finally {
+                finalizeFutureRequest.accept(id);
+            }
+        }
+        if (callback != null) {
+            blockingServiceExecutor.execute(() -> {
+                try {
+                    callback.accept(null, throwable);
+                } catch (Exception ignored) {
+                } finally {
+                    finalizeFutureRequest.accept(id);
+                }
+            });
+        }
     }
 }
 

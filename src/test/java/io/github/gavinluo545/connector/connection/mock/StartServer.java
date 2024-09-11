@@ -29,7 +29,6 @@ public class StartServer {
             int port = Integer.parseInt(entry.getKey().toString());
             Object deviceKey = entry.getValue().get(0).getConnection().getConnectionParamsMap().get("deviceKey");
             TcpServerConfig<ExampleResponseMessage, ExampleRequestMessage> config = new TcpServerConfig<>("127.0.0.1", port,
-                    MockConnectionData.hasMessageId, MockConnectionData.parcelRequest,
                     (channelId, integerFrameMessage) -> Objects.hash(channelId, integerFrameMessage.getMessageId()));
             config.setChannelActiveListener(channel -> log.info("客户端上线 channelId={}", channel.id().asShortText()));
             config.setChannelInActiveListener(channel -> log.info("客户端下线 channelId={}", channel.id().asShortText()));

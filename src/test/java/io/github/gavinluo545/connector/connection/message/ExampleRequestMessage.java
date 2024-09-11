@@ -53,11 +53,6 @@ public class ExampleRequestMessage extends AbstractFrameMessage {
     }
 
     @Override
-    public boolean hasMessageId() {
-        return true;
-    }
-
-    @Override
     public Integer getMessageId() {
         return ((ExampleHeader) getHeader()).getMessageId();
     }

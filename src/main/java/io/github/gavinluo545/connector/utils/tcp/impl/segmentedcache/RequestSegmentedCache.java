@@ -2,9 +2,6 @@ package io.github.gavinluo545.connector.utils.tcp.impl.segmentedcache;
 
 import io.github.gavinluo545.connector.utils.tcp.impl.TcpQPS;
 import io.github.gavinluo545.connector.utils.tcp.impl.message.FutureRequest;
-import cn.hutool.core.date.SystemClock;
-
-import java.util.concurrent.TimeUnit;
 
 public class RequestSegmentedCache extends SegmentedCache<Integer, FutureRequest> {
 
@@ -13,8 +10,8 @@ public class RequestSegmentedCache extends SegmentedCache<Integer, FutureRequest
     }
 
     @Override
-    public void put(Integer key, FutureRequest value) {
-        super.put(key, new ExpiringValue(value, SystemClock.now() + TimeUnit.SECONDS.toMillis(value.getSendRequestTimeoutSenconds() + value.getWaitResponseTimeoutSenconds())));
+    public void put(Integer key, FutureRequest value, long expireTimestamp, Runnable whenExpire) {
+        super.put(key, new ExpiringValue(value, expireTimestamp, whenExpire));
         TcpQPS.requestSegmentedCacheAddQpsIncr();
     }
 

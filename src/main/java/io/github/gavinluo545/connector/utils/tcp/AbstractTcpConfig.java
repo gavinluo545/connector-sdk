@@ -21,14 +21,6 @@ public class AbstractTcpConfig<I extends FrameMessage, O extends FrameMessage> i
      */
     private final Integer port;
     /**
-     * 是否有消息id
-     */
-    private final boolean hasMessageId;
-    /**
-     * 支持并发请求
-     */
-    private final boolean parcelRequest;
-    /**
      * 指定是否启用TCP保活机制
      * 对应于套接字选项中的SO_KEEPALIVE，该参数用于设置TCP连接，当设置该选项以后，连接会测试链接的状态，
      * 这个选项用于可能长时间没有数据交流的连接。当设置该选项以后，如果在两小时内没有数据的通信时，TCP会自动发送一个活动探测数据报文。
@@ -85,12 +77,10 @@ public class AbstractTcpConfig<I extends FrameMessage, O extends FrameMessage> i
     int requestRateLimiterLimitForSeconds = 10;
     int responseRateLimiterLimitForSeconds = 10;
 
-    public AbstractTcpConfig(String ip, Integer port, boolean hasMessageId, boolean parcelRequest,
+    public AbstractTcpConfig(String ip, Integer port,
                              BiFunction<String, FrameMessage, Integer> sequenceIdFunc) {
         this.ip = ip;
         this.port = port;
-        this.hasMessageId = hasMessageId;
-        this.parcelRequest = parcelRequest;
         this.sequenceIdFunc = sequenceIdFunc;
     }
 }

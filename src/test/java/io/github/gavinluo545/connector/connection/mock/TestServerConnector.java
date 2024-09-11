@@ -32,7 +32,7 @@ public class TestServerConnector {
             public void reportAction(List<TagData> results) {
                 long count = results.stream().filter(x -> x.getQ() == StatusCode.OK).count();
                 long errorCount = results.size() - count;
-//                log.info("上报平台 success={} failed={}", count, errorCount);
+                log.info("上报平台 success={} failed={}", count, errorCount);
             }
         };
         for (ConnectionTags entry : connectionTagsList) {

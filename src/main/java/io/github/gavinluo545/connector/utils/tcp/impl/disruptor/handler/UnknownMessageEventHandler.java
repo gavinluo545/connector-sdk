@@ -1,24 +1,28 @@
 package io.github.gavinluo545.connector.utils.tcp.impl.disruptor.handler;
 
+import com.lmax.disruptor.EventHandler;
+import com.lmax.disruptor.WorkHandler;
 import io.github.gavinluo545.connector.utils.tcp.impl.TcpQPS;
 import io.github.gavinluo545.connector.utils.tcp.impl.disruptor.SequenceId;
 import io.github.gavinluo545.connector.utils.tcp.impl.message.ResponseEvent;
 import io.github.gavinluo545.connector.utils.tcp.message.FrameMessage;
-import com.lmax.disruptor.EventHandler;
-import com.lmax.disruptor.WorkHandler;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
 
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
 public class UnknownMessageEventHandler implements EventHandler<SequenceId>, WorkHandler<SequenceId> {
     private final Function<String, Channel> getChannelFunc;
     private final Function<Integer, ResponseEvent> getResponseEvent;
+    private final Function<String/*serverId-clientId clientId-clientId*/, BiConsumer<Channel, FrameMessage> /*unknownMessageListener*/> unknownMessageListenerGet;
     private final Consumer<Integer> finalizeResponseEvent;
     private final EventLoopGroup blockingServiceExecutor;
 
-    public UnknownMessageEventHandler(EventLoopGroup blockingServiceExecutor, Function<String, Channel> getChannelFunc, Function<Integer, ResponseEvent> getResponseEvent, Consumer<Integer> finalizeResponseEvent) {
+    public UnknownMessageEventHandler(EventLoopGroup blockingServiceExecutor, Function<String/*serverId-clientId clientId-clientId*/, BiConsumer<Channel, FrameMessage> /*unknownMessageListener*/> unknownMessageListenerGet,
+                                      Function<String, Channel> getChannelFunc, Function<Integer, ResponseEvent> getResponseEvent, Consumer<Integer> finalizeResponseEvent) {
+        this.unknownMessageListenerGet = unknownMessageListenerGet;
         this.blockingServiceExecutor = blockingServiceExecutor;
         this.getChannelFunc = getChannelFunc;
         this.getResponseEvent = getResponseEvent;
@@ -46,7 +50,11 @@ public class UnknownMessageEventHandler implements EventHandler<SequenceId>, Wor
     public void executeResponse(SequenceId sequenceId) {
         int id = sequenceId.getSequenceId();
         ResponseEvent event = getResponseEvent.apply(id);
-        if (event == null || event.getUnknownMessageListener() == null) {
+        if (event == null) {
+            return;
+        }
+        BiConsumer<Channel, FrameMessage> unknownMessageListener = unknownMessageListenerGet.apply(event.getChannelId());
+        if (unknownMessageListener == null) {
             return;
         }
         try {
@@ -54,7 +62,7 @@ public class UnknownMessageEventHandler implements EventHandler<SequenceId>, Wor
             Channel channel = getChannelFunc.apply(event.getChannelId());
             blockingServiceExecutor.execute(() -> {
                 try {
-                    event.getUnknownMessageListener().accept(channel, frameMessage);
+                    unknownMessageListener.accept(channel, frameMessage);
                 } catch (Exception ignored) {
                 }
             });

@@ -2,9 +2,6 @@ package io.github.gavinluo545.connector.utils.tcp.impl.segmentedcache;
 
 import io.github.gavinluo545.connector.utils.tcp.impl.TcpQPS;
 import io.github.gavinluo545.connector.utils.tcp.impl.message.ResponseEvent;
-import cn.hutool.core.date.SystemClock;
-
-import java.util.concurrent.TimeUnit;
 
 public class UnknownMessageSegmentedCache extends SegmentedCache<Integer, ResponseEvent> {
 
@@ -19,8 +16,8 @@ public class UnknownMessageSegmentedCache extends SegmentedCache<Integer, Respon
     }
 
     @Override
-    public void put(Integer key, ResponseEvent value) {
-        super.put(key, new ExpiringValue(value, SystemClock.now() + TimeUnit.SECONDS.toMillis(value.getUnknownMeesageUnusedTimeoutSenconds())));
+    public void put(Integer key, ResponseEvent value, long expireTimestamp, Runnable whenExpire) {
+        super.put(key, new ExpiringValue(value, expireTimestamp,whenExpire));
         TcpQPS.unknownMessageSegmentedCacheAddQpsIncr();
     }
 }

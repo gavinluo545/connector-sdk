@@ -8,7 +8,7 @@ import java.util.function.BiFunction;
 
 @Setter
 @Getter
-public class TcpClientConfig<I extends FrameMessage, O extends FrameMessage> extends AbstractTcpConfig<I,O> {
+public class TcpClientConfig<I extends FrameMessage, O extends FrameMessage> extends AbstractTcpConfig<I, O> {
 
     /**
      * 客户端与服务端连接超时时长，单位毫秒
@@ -27,8 +27,8 @@ public class TcpClientConfig<I extends FrameMessage, O extends FrameMessage> ext
      */
     private Integer autoReconnectMaxMinutes = 1440;
 
-    public TcpClientConfig(String ip, Integer port, boolean hasMessageId, boolean isParcelRequest,
+    public TcpClientConfig(String ip, Integer port,
                            BiFunction<String, FrameMessage, Integer> sequenceIdFunc) {
-        super(ip, port, hasMessageId, isParcelRequest, sequenceIdFunc);
+        super(ip, port, sequenceIdFunc);
     }
 }

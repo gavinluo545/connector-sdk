@@ -1,5 +1,6 @@
 package io.github.gavinluo545.connector.utils.tcp.impl;
 
+import cn.hutool.core.date.SystemClock;
 import io.github.gavinluo545.connector.utils.executor.ExecutorFactory;
 import io.github.gavinluo545.connector.utils.executor.NameThreadFactory;
 import io.github.gavinluo545.connector.utils.executor.ThreadUtils;
@@ -34,8 +35,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 @Slf4j
 @Getter
@@ -47,9 +48,15 @@ public abstract class AbstractTcp<I extends AbstractFrameMessage, O extends Abst
     protected static final RequestSegmentedCache requestSegmentedCache = new RequestSegmentedCache(Integer.parseInt(System.getProperty("shareRequestSegmentedCount", String.valueOf(32))));
     protected static final ResponseSegmentedCache responseSegmentedCache = new ResponseSegmentedCache(Integer.parseInt(System.getProperty("shareResponseSegmentedCount", String.valueOf(32))));
     protected static final UnknownMessageSegmentedCache unknownMessageSegmentedCache = new UnknownMessageSegmentedCache(Integer.parseInt(System.getProperty("shareUnknownMessageSegmentedCount", String.valueOf(32))));
-    protected static final RequestDisruptor requestDisruptor = new RequestDisruptor(workerGroup, "ShareRequestDisruptor", Integer.parseInt(System.getProperty("shareRequestDisruptorRingBufferSize", String.valueOf(65536))), Integer.parseInt(System.getProperty("shareRequestWorkHandlerNum", String.valueOf(Runtime.getRuntime().availableProcessors()))), clientChannles::get, requestSegmentedCache::get, requestSegmentedCache::remove);
+    protected static final Map<String/*serverId-clientId clientId-clientId*/, Byte/*timeoutSenconds*/> sendRequestTimeoutSencondsGet = new ConcurrentHashMap<>();
+    protected static final Map<String/*serverId-clientId clientId-clientId*/, BiConsumer<Channel, FrameMessage> /*unknownMessageListener*/> unknownMessageListenerGet = new ConcurrentHashMap<>();
+
+    protected static final RequestDisruptor requestDisruptor = new RequestDisruptor(workerGroup, "ShareRequestDisruptor",
+            Integer.parseInt(System.getProperty("shareRequestDisruptorRingBufferSize", String.valueOf(65536))),
+            Integer.parseInt(System.getProperty("shareRequestWorkHandlerNum", String.valueOf(Runtime.getRuntime().availableProcessors()))),
+            sendRequestTimeoutSencondsGet::get, clientChannles::get, requestSegmentedCache::get, requestSegmentedCache::remove);
     protected static final ResponseDisruptor responseDisruptor = new ResponseDisruptor(workerGroup, "ShareResponseDisruptor", Integer.parseInt(System.getProperty("shareResponseDisruptorRingBufferSize", String.valueOf(65536))), Integer.parseInt(System.getProperty("shareResponceWorkHandlerNum", String.valueOf(Runtime.getRuntime().availableProcessors()))), responseSegmentedCache::get, responseSegmentedCache::remove, requestSegmentedCache::get, requestSegmentedCache::remove);
-    protected static final UnknownMessageDisruptor unknownMessageDisruptor = new UnknownMessageDisruptor(workerGroup, "ShareUnknownMessageDisruptor", Integer.parseInt(System.getProperty("shareUnknownMessageDisruptorRingBufferSize", String.valueOf(65536))), Integer.parseInt(System.getProperty("shareUnknownMessageWorkHandlerNum", String.valueOf(Runtime.getRuntime().availableProcessors()))), clientChannles::get, unknownMessageSegmentedCache::get, unknownMessageSegmentedCache::remove);
+    protected static final UnknownMessageDisruptor unknownMessageDisruptor = new UnknownMessageDisruptor(workerGroup, "ShareUnknownMessageDisruptor", Integer.parseInt(System.getProperty("shareUnknownMessageDisruptorRingBufferSize", String.valueOf(65536))), Integer.parseInt(System.getProperty("shareUnknownMessageWorkHandlerNum", String.valueOf(Runtime.getRuntime().availableProcessors()))), unknownMessageListenerGet::get, clientChannles::get, unknownMessageSegmentedCache::get, unknownMessageSegmentedCache::remove);
 
     protected static final int ST_NOT_STARTED = 1;
     protected static final int ST_STARTED = 2;
@@ -66,16 +73,11 @@ public abstract class AbstractTcp<I extends AbstractFrameMessage, O extends Abst
 
     protected Channel channel;
 
-    protected AtomicReference<FutureRequest> oneRequest;
-
     protected RateLimiterRegistry requestRateLimiterRegistry;
     protected RateLimiterRegistry responseRateLimiterRegistry;
 
     public AbstractTcp(Config tcpConfig) {
         config = tcpConfig;
-        if (!config.isParcelRequest()) {
-            oneRequest = new AtomicReference<>();
-        }
     }
 
     public abstract MessageToByteEncoder<I> newMessageToByteEncoder();
@@ -84,12 +86,12 @@ public abstract class AbstractTcp<I extends AbstractFrameMessage, O extends Abst
 
     public abstract ByteToMessageDecoder newByteToMessageDecoder();
 
-    public boolean stateUpdate(int state) {
+    protected boolean stateUpdate(int state) {
         int oldState = this.state;
         return STATE_UPDATER.compareAndSet(this, oldState, state);
     }
 
-    public void initChannel(ChannelPipeline pipeline) {
+    protected void initChannel(ChannelPipeline pipeline) {
         pipeline.addLast(newMessageToByteEncoder());
         pipeline.addLast(newBasedFrameDecoder());
         pipeline.addLast(newByteToMessageDecoder());
@@ -154,6 +156,8 @@ public abstract class AbstractTcp<I extends AbstractFrameMessage, O extends Abst
             }
         });
         removes.forEach(clientChannles::remove);
+        removes.forEach(sendRequestTimeoutSencondsGet::remove);
+        removes.forEach(unknownMessageListenerGet::remove);
         String channelString = channel == null ? "" : channel.toString();
         channel = null;
         stateUpdate(ST_SHUTDOWN);
@@ -169,16 +173,17 @@ public abstract class AbstractTcp<I extends AbstractFrameMessage, O extends Abst
         return shutdownFuture;
     }
 
+    @SuppressWarnings({"unchecked"})
     @Override
     public void channelActive(ChannelHandlerContext ctx) {
         Channel channel = ctx.channel();
         log.info("Channel上线:{}", channel);
         String channelId = channel.id().asShortText();
         clientChannles.putIfAbsent(String.format("%s-%s", getChannel().id().asShortText(), channelId), ctx.channel());
-        if (config.isParcelRequest()) {
-            requestRateLimiterRegistry.rateLimiter(channelId);
-            responseRateLimiterRegistry.rateLimiter(channelId);
-        }
+        sendRequestTimeoutSencondsGet.putIfAbsent(String.format("%s-%s", getChannel().id().asShortText(), channelId), config.getSendRequestTimeoutSenconds());
+        unknownMessageListenerGet.putIfAbsent(String.format("%s-%s", getChannel().id().asShortText(), channelId), (channel1, frameMessage) -> config.getUnknownMessageListener().accept(channel1, (O) frameMessage));
+        requestRateLimiterRegistry.rateLimiter(channelId);
+        responseRateLimiterRegistry.rateLimiter(channelId);
         startHeartbeat(channel);
         try {
             Optional.ofNullable(config.getChannelActiveListener()).ifPresent(c -> {
@@ -199,11 +204,11 @@ public abstract class AbstractTcp<I extends AbstractFrameMessage, O extends Abst
         log.info("Channel下线:{}", channel);
         String channelId = channel.id().asShortText();
         stopHeartbeat(channel);
-        if (config.isParcelRequest()) {
-            requestRateLimiterRegistry.remove(channelId);
-            responseRateLimiterRegistry.remove(channelId);
-        }
+        requestRateLimiterRegistry.remove(channelId);
+        responseRateLimiterRegistry.remove(channelId);
         clientChannles.remove(String.format("%s-%s", getChannel().id().asShortText(), channelId));
+        sendRequestTimeoutSencondsGet.remove(String.format("%s-%s", getChannel().id().asShortText(), channelId));
+        unknownMessageListenerGet.remove(String.format("%s-%s", getChannel().id().asShortText(), channelId));
         try {
             Optional.ofNullable(config.getChannelInActiveListener()).ifPresent(c -> {
                 workerGroup.execute(() -> {
@@ -274,49 +279,43 @@ public abstract class AbstractTcp<I extends AbstractFrameMessage, O extends Abst
         RateLimiter rateLimiter = responseRateLimiterRegistry.find(channelId).orElse(responseRateLimiterRegistry.rateLimiter("default"));
         boolean acquirePermission = rateLimiter.acquirePermission();
 
-        boolean hasMessageId = config.isHasMessageId();
         if (!acquirePermission) {
-            if (hasMessageId) {
-                //获取请求 然后拒绝
-                int id = getSequenceId(channelId, msg);
-                FutureRequest futureRequest = getRequest(id);
-                if (futureRequest != null) {
-                    rejectRequest(futureRequest, id, rateLimiter);
-                    return;
-                }
+            int id = getSequenceId(channelId, msg);
+            FutureRequest futureRequest = requestSegmentedCache.get(id);
+            if (futureRequest != null) {
+                rejectRequest(futureRequest, id, RequestNotPermitted.createRequestNotPermitted(rateLimiter), requestSegmentedCache::remove);
             }
-            log.error("被流控拒绝:channelId={} messageId={}", channelId, msg.getMessageId());
+            log.error("被流控拒绝:channelId={} msg={}", channelId, msg);
         } else {
-            if (hasMessageId) {
-                //获取请求 然后响应
-                int id = getSequenceId(channelId, msg);
-                FutureRequest futureRequest = getRequest(id);
-                if (futureRequest != null) {
-                    boolean tryPublishEvent = responseDisruptor.getRingBuffer().tryPublishEvent(((event, sequence) -> {
-                        event.setSequenceId(id);
-                        responseSegmentedCache.put(id, new FutureResponse(msg, id, config.getResponseUnusedTimeoutSenconds()));
-                    }));
-                    if (!tryPublishEvent) {
-                        requestSegmentedCache.remove(id);
-                        responseSegmentedCache.remove(id);
-                    }
-                    return;
+            //获取请求 然后响应
+            int id = getSequenceId(channelId, msg);
+            FutureRequest futureRequest = requestSegmentedCache.get(id);
+            if (futureRequest != null) {
+                boolean tryPublishEvent = responseDisruptor.getRingBuffer().tryPublishEvent(((event, sequence) -> {
+                    event.setSequenceId(id);
+                    responseSegmentedCache.put(id, new FutureResponse(msg, id),
+                            SystemClock.now() + TimeUnit.SECONDS.toMillis(config.getResponseUnusedTimeoutSenconds()), null);
+                }));
+                if (!tryPublishEvent) {
+                    requestSegmentedCache.remove(id);
+                    responseSegmentedCache.remove(id);
                 }
+                return;
             }
-            //找不到请求 没有消息id
+            //找不到请求
             publishUnknowMessage(msg, channelId);
         }
     }
 
-    public void rejectRequest(FutureRequest futureRequest, int id, RateLimiter rateLimiter) {
+    protected void rejectRequest(FutureRequest futureRequest, int id, Throwable throwable, Consumer<Integer> finallyEvent) {
         BiConsumer<FrameMessage, Throwable> callback = futureRequest.getCallback();
         if (callback != null) {
             workerGroup.execute(() -> {
                 try {
-                    callback.accept(null, RequestNotPermitted.createRequestNotPermitted(rateLimiter));
+                    callback.accept(null, throwable);
                 } catch (Exception ignored) {
                 } finally {
-                    requestSegmentedCache.remove(id);
+                    finallyEvent.accept(id);
                 }
             });
             return;
@@ -324,27 +323,19 @@ public abstract class AbstractTcp<I extends AbstractFrameMessage, O extends Abst
         try {
             CompletableFuture<FrameMessage> future = futureRequest.getFuture();
             if (future != null && unFinished(future)) {
-                future.completeExceptionally(RequestNotPermitted.createRequestNotPermitted(rateLimiter));
+                future.completeExceptionally(throwable);
             }
         } finally {
-            requestSegmentedCache.remove(id);
+            finallyEvent.accept(id);
         }
     }
 
-    public FutureRequest getRequest(int id) {
-        if (!config.isParcelRequest()) {
-            return oneRequest.get();
-        } else {
-            return requestSegmentedCache.get(id);
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    public void publishUnknowMessage(O msg, String channelId) {
+    protected void publishUnknowMessage(O msg, String channelId) {
         int sequenceId = getSequenceId(channelId, msg);
         boolean tryPublishEvent = unknownMessageDisruptor.getRingBuffer().tryPublishEvent(((event, sequence) -> {
             event.setSequenceId(sequenceId);
-            unknownMessageSegmentedCache.put(sequenceId, new ResponseEvent(String.format("%s-%s", getChannel().id().asShortText(), channelId), msg, (channel, frameMessage) -> config.getUnknownMessageListener().accept(channel, (O) frameMessage), config.getUnknownMeesageUnusedTimeoutSenconds()));
+            unknownMessageSegmentedCache.put(sequenceId, new ResponseEvent(String.format("%s-%s", getChannel().id().asShortText(), channelId), msg),
+                    SystemClock.now() + TimeUnit.SECONDS.toMillis(config.getUnknownMeesageUnusedTimeoutSenconds()), null);
         }));
         if (!tryPublishEvent) {
             unknownMessageSegmentedCache.remove(sequenceId);
@@ -388,25 +379,15 @@ public abstract class AbstractTcp<I extends AbstractFrameMessage, O extends Abst
         }
         String channelId = channel.id().asShortText();
         String cid = String.format("%s-%s", getChannel().id().asShortText(), channelId);
-        if (!config.isParcelRequest()) {
-            if (oneRequest.get() != null) {
-                future.completeExceptionally(new RejectedExecutionException("不支持并发请求，并且当前有一个未完成的请求"));
-            } else {
-                oneRequest.set(new FutureRequest(cid, request, wrapFuture, config.getWaitResponseTimeoutSenconds(), config.getSendRequestTimeoutSenconds()));
-            }
-            return future;
-        }
-        if (!config.isHasMessageId()) {
-            future.completeExceptionally(new RejectedExecutionException("如果并发没有 messsageId，该方法不支持等待响应，因此使用 sendRequestNoNeedResponse 执行 unknownMessageListener 报告"));
-            return future;
-        }
         try {
             RateLimiter rateLimiter = requestRateLimiterRegistry.find(channelId).orElse(requestRateLimiterRegistry.rateLimiter("default"));
             if (rateLimiter.acquirePermission()) {
                 int sequenceId = getSequenceId(channelId, request);
                 boolean tryPublishEvent = requestDisruptor.getRingBuffer().tryPublishEvent(((event, sequence) -> {
                     event.setSequenceId(sequenceId);
-                    requestSegmentedCache.put(sequenceId, new FutureRequest(cid, request, wrapFuture, config.getWaitResponseTimeoutSenconds(), config.getSendRequestTimeoutSenconds()));
+                    FutureRequest futureRequest = new FutureRequest(cid, request, wrapFuture);
+                    requestSegmentedCache.put(sequenceId, futureRequest, SystemClock.now() + TimeUnit.SECONDS.toMillis(config.getWaitResponseTimeoutSenconds()),
+                            () -> failed(futureRequest, new TimeoutException("等待请求响应超时")));
                 }));
                 if (!tryPublishEvent) {
                     requestSegmentedCache.remove(sequenceId);
@@ -420,6 +401,22 @@ public abstract class AbstractTcp<I extends AbstractFrameMessage, O extends Abst
         return future;
     }
 
+    public void failed(FutureRequest futureRequest, Throwable throwable) {
+        CompletableFuture<FrameMessage> returnFuture = futureRequest.getFuture();
+        BiConsumer<FrameMessage, Throwable> callback = futureRequest.getCallback();
+        if (returnFuture != null && unFinished(returnFuture)) {
+            returnFuture.completeExceptionally(throwable);
+        }
+        if (callback != null) {
+            workerGroup.execute(() -> {
+                try {
+                    callback.accept(null, throwable);
+                } catch (Exception ignored) {
+                }
+            });
+        }
+    }
+
     @Override
     @SuppressWarnings("unchecked")
     public void sendRequestSyncCallback(Channel channel, I request, BiConsumer<O, Throwable> callback) throws Exception {
@@ -430,24 +427,15 @@ public abstract class AbstractTcp<I extends AbstractFrameMessage, O extends Abst
             BiConsumer<FrameMessage, Throwable> wrapCallback = (frameMessage, throwable) -> callback.accept((O) frameMessage, throwable);
             String channelId = channel.id().asShortText();
             String cid = String.format("%s-%s", getChannel().id().asShortText(), channelId);
-            if (!config.isParcelRequest()) {
-                if (oneRequest.get() != null) {
-                    throw new RejectedExecutionException("不支持并发请求，并且当前有一个未完成的请求");
-                } else {
-                    oneRequest.set(new FutureRequest(cid, request, wrapCallback, config.getWaitResponseTimeoutSenconds(), config.getSendRequestTimeoutSenconds()));
-                }
-                return;
-            }
-            if (!config.isHasMessageId()) {
-                callback.accept(null, new RejectedExecutionException("如果并发没有 messsageId，该方法不支持等待响应，因此使用 sendRequestNoNeedResponse 执行 unknownMessageListener 报告"));
-                return;
-            }
+
             RateLimiter rateLimiter = requestRateLimiterRegistry.find(channelId).orElse(requestRateLimiterRegistry.rateLimiter("default"));
             if (rateLimiter.acquirePermission()) {
                 int sequenceId = getSequenceId(channelId, request);
                 boolean tryPublishEvent = requestDisruptor.getRingBuffer().tryPublishEvent(((event, sequence) -> {
                     event.setSequenceId(sequenceId);
-                    requestSegmentedCache.put(sequenceId, new FutureRequest(cid, request, wrapCallback, config.getWaitResponseTimeoutSenconds(), config.getSendRequestTimeoutSenconds()));
+                    FutureRequest futureRequest = new FutureRequest(cid, request, wrapCallback);
+                    requestSegmentedCache.put(sequenceId, futureRequest, SystemClock.now() + TimeUnit.SECONDS.toMillis(config.getWaitResponseTimeoutSenconds()),
+                            () -> failed(futureRequest, new TimeoutException("等待请求响应超时")));
                 }));
                 if (!tryPublishEvent) {
                     requestSegmentedCache.remove(sequenceId);
@@ -472,21 +460,15 @@ public abstract class AbstractTcp<I extends AbstractFrameMessage, O extends Abst
         }
         String channelId = channel.id().asShortText();
         String cid = String.format("%s-%s", getChannel().id().asShortText(), channelId);
-        if (!config.isParcelRequest()) {
-            if (oneRequest.get() != null) {
-                throw new RejectedExecutionException("不支持并发请求，并且当前有一个未完成的请求");
-            } else {
-                oneRequest.set(new FutureRequest(cid, request));
-            }
-            return;
-        }
 
         RateLimiter rateLimiter = requestRateLimiterRegistry.find(channelId).orElse(requestRateLimiterRegistry.rateLimiter("default"));
         if (rateLimiter.acquirePermission()) {
             int sequenceId = getSequenceId(channelId, request);
             boolean tryPublishEvent = requestDisruptor.getRingBuffer().tryPublishEvent(((event, sequence) -> {
                 event.setSequenceId(sequenceId);
-                requestSegmentedCache.put(sequenceId, new FutureRequest(cid, request));
+                FutureRequest futureRequest = new FutureRequest(cid, request);
+                requestSegmentedCache.put(sequenceId, futureRequest, SystemClock.now() + TimeUnit.SECONDS.toMillis(config.getWaitResponseTimeoutSenconds()),
+                        () -> failed(futureRequest, new TimeoutException("等待请求响应超时")));
             }));
             if (!tryPublishEvent) {
                 requestSegmentedCache.remove(sequenceId);
@@ -495,11 +477,11 @@ public abstract class AbstractTcp<I extends AbstractFrameMessage, O extends Abst
         throw RequestNotPermitted.createRequestNotPermitted(rateLimiter);
     }
 
-    public int getSequenceId(String channelId, FrameMessage request) {
+    protected int getSequenceId(String channelId, FrameMessage request) {
         return config.getSequenceIdFunc().apply(channelId, request);
     }
 
-    public boolean unFinished(CompletableFuture<?> completableFuture) {
+    protected boolean unFinished(CompletableFuture<?> completableFuture) {
         return !completableFuture.isCancelled() && !completableFuture.isDone() && !completableFuture.isCompletedExceptionally();
     }
 

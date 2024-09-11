@@ -2,10 +2,14 @@ package io.github.gavinluo545.connector.connection;
 
 import io.github.gavinluo545.connector.utils.executor.ExecutorFactory;
 import io.github.gavinluo545.connector.utils.executor.NameThreadFactory;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 @Slf4j
@@ -121,5 +125,28 @@ public class AutoRecoveryManager {
         autoRecoveryTasks.stream().filter(e -> e.getConnector().getConnection().getConnectionId().equals(connectionId)).forEach(e -> e.getGatherTagsDataFutures().forEach((k, v) -> v.cancel(true)));
     }
 
+    @Getter
+    public static class AutoRecoveryTask {
+        private final Connector connector;
+        private long nextRunTime;
+        @Setter
+        private volatile boolean shutdown;
+        protected Map<Long, CompletableFuture<?>> gatherTagsDataFutures;
+        private final AtomicInteger reconnectionCount = new AtomicInteger(0);
 
+        public AutoRecoveryTask(Connector connector, long nextRunTime) {
+            this.connector = connector;
+            this.nextRunTime = nextRunTime;
+            this.gatherTagsDataFutures = new ConcurrentHashMap<>();
+        }
+
+        public void exec(CompletableFuture<?> future) {
+            gatherTagsDataFutures.put(System.nanoTime(), future);
+        }
+
+        public void refreshNextRunTime() {
+            nextRunTime = System.nanoTime() + TimeUnit.SECONDS.toNanos(connector.connection.getRecoveryInterval());
+        }
+
+    }
 }

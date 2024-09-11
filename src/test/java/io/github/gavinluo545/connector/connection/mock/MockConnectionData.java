@@ -19,7 +19,6 @@ import java.util.stream.IntStream;
 
 public class MockConnectionData {
     public static int port = 2000;
-    public static final boolean hasMessageId = true;
     public static final boolean parcelRequest = true;
     static final Map<Connection, List<Tag>> connectionTagsMap = new HashMap<>();
     public static int totalServerNum = 30;

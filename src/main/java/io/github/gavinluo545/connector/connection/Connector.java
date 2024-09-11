@@ -114,8 +114,7 @@ public abstract class Connector {
         return false;
     }
 
-    public boolean tagReadUseProactiveReporting(List<Tag> tags) {
-        return true;
+    public void tagReadUseProactiveReporting(List<Tag> tags) {
     }
 
     public static final CompletableFuture<List<TagData>> connectorClosed = new CompletableFuture<>();
@@ -127,10 +126,6 @@ public abstract class Connector {
     public abstract CompletableFuture<List<TagData>> tagRead(List<Tag> tags);
 
     public abstract CompletableFuture<List<TagData>> tagWrite(List<TagWrite> tagWrites);
-
-    public boolean isParallelCollect() {
-        return true;
-    }
 
     public void startGatherTagsData() {
         GatherTagsDataManager.InstanceHolder.DEFAULT.startGatherTagsData(this);

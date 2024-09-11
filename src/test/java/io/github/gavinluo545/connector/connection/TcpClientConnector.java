@@ -47,10 +47,6 @@ public class TcpClientConnector extends AbstractTcpClientConnector<ExampleReques
         return objectNode.get("port").asInt();
     }
 
-    @Override
-    public boolean hasMessageId() {
-        return true;
-    }
 
     @Override
     public TcpClient newTcp(TcpClientConfig<ExampleRequestMessage, ExampleResponseMessage> config) {

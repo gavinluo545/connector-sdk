@@ -10,10 +10,10 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
+@SuppressWarnings({"unused"})
 @Slf4j
 public class GatherTagsDataManager {
 
@@ -101,17 +101,12 @@ public class GatherTagsDataManager {
                     execList.forEach(e -> {
                         e.refreshNextRunTime();
                         Connector connector = e.connector;
-                        if (!connector.isParallelCollect()) {
-                            if (!e.isFinished.compareAndSet(true, false)) {
-                                return;
-                            }
-                        }
                         if (connector.tagReadResultsUseProactiveReporting()) {
                             e.exec(CompletableFuture.runAsync(() -> {
-                                if (connector.tagReadUseProactiveReporting(e.tags())) {
-                                    if (!connector.isParallelCollect()) {
-                                        e.isFinished.compareAndSet(false, true);
-                                    }
+                                try {
+                                    connector.tagReadUseProactiveReporting(e.tags());
+                                } catch (Exception ex) {
+                                    log.error("采集点位数据任务失败", ex);
                                 }
                             }, proactiveReportingExecutorService));
                         } else {
@@ -125,10 +120,6 @@ public class GatherTagsDataManager {
                                     .exceptionally(throwable -> {
                                         log.error("采集点位数据任务失败", throwable);
                                         return null;
-                                    }).whenComplete((unused, throwable) -> {
-                                        if (!connector.isParallelCollect()) {
-                                            e.isFinished.compareAndSet(false, true);
-                                        }
                                     })
                             );
                         }
@@ -180,13 +171,8 @@ public class GatherTagsDataManager {
 
     public static Collector<Tag, ?, Map<Integer, List<Tag>>> tagMapCollector(Connector connector) {
         Collector<Tag, ?, Map<Integer, List<Tag>>> tagMapCollector;
-        if (connector.isParallelCollect()) {
-            //并行采集按周期
-            tagMapCollector = Collectors.groupingBy(Tag::getCollectionPeriod);
-        } else {
-            //半双工设备按帧间隔串行采集
-            tagMapCollector = Collectors.groupingBy(tag -> connector.connection.getTimeWait());
-        }
+        //并行采集按周期
+        tagMapCollector = Collectors.groupingBy(Tag::getCollectionPeriod);
         return tagMapCollector;
     }
 
@@ -209,10 +195,6 @@ public class GatherTagsDataManager {
          * 采集任务对应的未来任务列表
          */
         protected Map<Long, CompletableFuture<?>> gatherTagsDataFutures;
-        /**
-         * 是否完成
-         */
-        private final AtomicBoolean isFinished = new AtomicBoolean(true);
 
         /**
          * 构造方法，初始化采集任务。

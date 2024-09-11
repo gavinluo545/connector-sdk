@@ -21,7 +21,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 @Getter
@@ -30,8 +29,7 @@ import java.util.stream.Collectors;
 public abstract class AbstractTcpServerConnector<I extends AbstractFrameMessage, O extends AbstractFrameMessage> extends AbstractTcpConnector<I, O, TcpServerConfig<I, O>> {
 
     protected final Map<Serializable, ChannelWrap> deviceKeyToChannelMap = new ConcurrentHashMap<>();
-    private TcpServerConfig<I, O> config = new TcpServerConfig<>(getIp(), getPort(), hasMessageId(),
-            isParallelCollect(),
+    private TcpServerConfig<I, O> config = new TcpServerConfig<>(getIp(), getPort(),
             (channelId, frameMessage) -> Objects.hash(channelId, frameMessage.getMessageId()));
 
     public AbstractTcpServerConnector(Connection connection, List<Tag> tags, AbstractTagsDataReporter tagsDataReporter) {
@@ -110,7 +108,7 @@ public abstract class AbstractTcpServerConnector<I extends AbstractFrameMessage,
     }
 
     @Override
-    public boolean tagReadUseProactiveReporting(List<Tag> tags) {
+    public void tagReadUseProactiveReporting(List<Tag> tags) {
         if (state()) {
             Map<ChannelWrap, List<I>> channels = getChannelsForRead(tags);
             channels.keySet().forEach(channelWrap -> {
@@ -123,31 +121,19 @@ public abstract class AbstractTcpServerConnector<I extends AbstractFrameMessage,
                         return;
                     }
                     try {
-                        AtomicLong isDone = new AtomicLong(0);
                         tcp.sendRequestSyncCallback(channel, message, (o, throwable) -> {
-                            try {
-                                if (throwable != null) {
-                                    log.error("读点异常 connectionId={} deviceKey={}", connection.getConnectionId(), deviceKey, throwable);
-                                } else {
-                                    unknownMessageReceiveProcess(deviceKey, o);
-                                }
-                            } finally {
-                                isDone.set(System.currentTimeMillis());
+                            if (throwable != null) {
+                                log.error("读点异常 connectionId={} deviceKey={}", connection.getConnectionId(), deviceKey, throwable);
+                            } else {
+                                unknownMessageReceiveProcess(deviceKey, o);
                             }
                         });
-                        if (!isParallelCollect()) {
-                            while (isDone.get() == 0) {
-                                Thread.sleep(100);
-                            }
-                            Thread.sleep(connection.getTimeWait());
-                        }
                     } catch (Exception e) {
                         log.error("读点异常 connectionId={} deviceKey={}", connection.getConnectionId(), deviceKey, e);
                     }
                 });
             });
         }
-        return true;
     }
 
     @SuppressWarnings({"unchecked"})

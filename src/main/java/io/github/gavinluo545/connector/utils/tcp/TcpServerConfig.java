@@ -25,8 +25,8 @@ public class TcpServerConfig<I extends FrameMessage, O extends FrameMessage> ext
      */
     private Integer bossGroupThreadSize = Math.max(1, SystemPropertyUtil.getInt("io.netty.eventLoopThreads", NettyRuntime.availableProcessors() * 2));
 
-    public TcpServerConfig(String ip, Integer port, boolean hasMessageId, boolean parcelRequest,
+    public TcpServerConfig(String ip, Integer port,
                            BiFunction<String, FrameMessage, Integer> sequenceIdFunc) {
-        super(ip, port, hasMessageId, parcelRequest, sequenceIdFunc);
+        super(ip, port, sequenceIdFunc);
     }
 }

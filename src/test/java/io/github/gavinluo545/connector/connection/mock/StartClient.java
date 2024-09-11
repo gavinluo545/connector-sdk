@@ -33,7 +33,6 @@ public class StartClient {
             int port = Integer.parseInt(connection.getConnectionParamsMap().get("port").toString());
             deviceKeyTags.forEach((deviceKey, tagList) -> {
                 TcpClientConfig<ExampleResponseMessage, ExampleRequestMessage> config = new TcpClientConfig<>("127.0.0.1", port,
-                        MockConnectionData.hasMessageId, MockConnectionData.parcelRequest,
                         (channelId, integerFrameMessage) -> Objects.hash(channelId, integerFrameMessage.getMessageId()));
                 HeartbeatConfig<ExampleResponseMessage> heartbeatConfig = new HeartbeatConfig<>(true, 30,
                         channel -> new ExampleResponseMessage(0, Integer.parseInt(deviceKey.toString()), 0x02, new ConcurrentHashMap<>()));

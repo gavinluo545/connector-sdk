@@ -1,10 +1,10 @@
 package io.github.gavinluo545.connector.utils.tcp.impl.segmentedcache;
 
+import cn.hutool.core.date.SystemClock;
+import cn.hutool.core.lang.Assert;
 import io.github.gavinluo545.connector.utils.executor.ExecutorFactory;
 import io.github.gavinluo545.connector.utils.executor.NameThreadFactory;
 import io.github.gavinluo545.connector.utils.executor.ThreadUtils;
-import cn.hutool.core.date.SystemClock;
-import cn.hutool.core.lang.Assert;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -30,12 +30,15 @@ public abstract class SegmentedCache<K, V> {
         expireExecutor.scheduleWithFixedDelay(() -> {
             for (ConcurrentHashMap<K, ExpiringValue> segment : segments) {
                 long now = SystemClock.now();
-                segment.entrySet().stream().filter(entry -> now > entry.getValue().getExpireTimestamp()).forEach(entry -> remove(entry.getKey()));
+                segment.entrySet().stream().filter(entry -> now > entry.getValue().getExpireTimestamp()).forEach(entry -> {
+                    remove(entry.getKey());
+                    Optional.ofNullable(entry.getValue().getWhenExpire()).ifPresent(Runnable::run);
+                });
             }
         }, 0, 100, TimeUnit.MILLISECONDS);
     }
 
-    public abstract void put(K key, V value);
+    public abstract void put(K key, V value, long expireTimestamp, Runnable whenExpire);
 
     public void put(K key, ExpiringValue value) {
         Assert.notNull(key);
@@ -74,5 +77,6 @@ public abstract class SegmentedCache<K, V> {
     public class ExpiringValue {
         protected final V value;
         protected final long expireTimestamp;
+        protected final Runnable whenExpire;
     }
 }

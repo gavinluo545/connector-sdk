@@ -16,14 +16,13 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 @Getter
 @Setter
 @Slf4j
 public abstract class AbstractTcpClientConnector<I extends AbstractFrameMessage, O extends AbstractFrameMessage> extends AbstractTcpConnector<I, O, TcpClientConfig<I, O>> {
-    private TcpClientConfig<I, O> config = new TcpClientConfig<>(getIp(), getPort(), hasMessageId(), isParallelCollect(),
+    private TcpClientConfig<I, O> config = new TcpClientConfig<>(getIp(), getPort(),
             (channelId, frameMessage) -> Objects.hash(channelId, frameMessage.getMessageId()));
 
     public AbstractTcpClientConnector(Connection connection, List<Tag> tags, AbstractTagsDataReporter tagsDataReporter) {
@@ -69,7 +68,7 @@ public abstract class AbstractTcpClientConnector<I extends AbstractFrameMessage,
     }
 
     @Override
-    public boolean tagReadUseProactiveReporting(List<Tag> tags) {
+    public void tagReadUseProactiveReporting(List<Tag> tags) {
         if (state()) {
             List<I> lists = getChannelsForRead(tags);
             lists.forEach(message -> {
@@ -78,32 +77,18 @@ public abstract class AbstractTcpClientConnector<I extends AbstractFrameMessage,
                 }
 
                 try {
-                    AtomicLong isDone = new AtomicLong(0);
                     tcp.sendRequestSyncCallback(tcp.getChannel(), message, (o, throwable) -> {
-                        try {
-                            if (throwable != null) {
-                                log.error("读点异常 connectionId={}", connection.getConnectionId(), throwable);
-                            } else {
-                                unknownMessageReceiveProcess(o);
-                            }
-                        } finally {
-                            if (!isParallelCollect()) {
-                                isDone.set(System.currentTimeMillis());
-                            }
+                        if (throwable != null) {
+                            log.error("读点异常 connectionId={}", connection.getConnectionId(), throwable);
+                        } else {
+                            unknownMessageReceiveProcess(o);
                         }
                     });
-                    if (!isParallelCollect()) {
-                        while (isDone.get() == 0) {
-                            Thread.sleep(100);
-                        }
-                        Thread.sleep(connection.getTimeWait());
-                    }
                 } catch (Exception e) {
                     log.error("读点异常 connectionId={}", connection.getConnectionId(), e);
                 }
             });
         }
-        return true;
     }
 
     @SuppressWarnings({"unchecked"})

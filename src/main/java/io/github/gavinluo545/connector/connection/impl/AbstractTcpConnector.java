@@ -37,8 +37,6 @@ public abstract class AbstractTcpConnector<I extends AbstractFrameMessage, O ext
 
     public abstract int getPort();
 
-    public abstract boolean hasMessageId();
-
     public abstract List<TagData> readResponseProcess(O responseMessage);
 
     public abstract List<TagData> writeReponseProcess(O responseMessage);

@@ -7,11 +7,10 @@ import lombok.Data;
 public class FutureResponse {
     private final FrameMessage message;
     private final int futureRequestSequenceId;
-    private final byte responseUnusedTimeoutSenconds;
-    public FutureResponse(FrameMessage message, int futureRequestSequenceId, byte responseUnusedTimeoutSenconds) {
+
+    public FutureResponse(FrameMessage message, int futureRequestSequenceId) {
         this.message = message;
         this.futureRequestSequenceId = futureRequestSequenceId;
-        this.responseUnusedTimeoutSenconds = responseUnusedTimeoutSenconds;
     }
 
 }
